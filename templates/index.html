@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediScan — AI Disease Classifier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #071019;
+      --bg2: #0d1a2c;
+      --bg3: #15233b;
+      --accent: #4dc9ff;
+      --accent2: #6d8cff;
+      --accent3: #f9b42e;
+      --accent4: #7dd3fc;
+      --text: #edf2f9;
+      --text2: #a3b1c4;
+      --border: rgba(255,255,255,0.08);
+      --card: rgba(18,29,47,0.88);
+      --glass: rgba(77,201,255,0.08);
+      --radius: 22px;
+      --shadow: 0 24px 80px rgba(0,0,0,0.35);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: radial-gradient(circle at top left, rgba(77,201,255,0.16), transparent 24%),
+                  radial-gradient(circle at bottom right, rgba(109,140,255,0.08), transparent 18%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND ── */
+    .bg-canvas {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      overflow: hidden;
+    }
+    .orb {
+      position: absolute; border-radius: 50%;
+      filter: blur(120px); opacity: 0.12;
+      animation: float 10s ease-in-out infinite;
+    }
+    .orb1 { width:600px;height:600px; background:var(--accent); top:-200px; right:-100px; animation-delay:0s; }
+    .orb2 { width:500px;height:500px; background:var(--accent2); bottom:-100px; left:-100px; animation-delay:3s; }
+    .orb3 { width:300px;height:300px; background:var(--accent4); top:50%; left:40%; animation-delay:6s; opacity:0.07; }
+    @keyframes float {
+      0%,100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-40px) scale(1.05); }
+    }
+
+    /* Grid overlay */
+    .grid-overlay {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      background: rgba(7,16,25,0.90);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 0 24px;
+    }
+    .nav-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 64px;
+    }
+    .logo {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.4rem; letter-spacing: -0.5px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px; border-radius: 12px;
+      background: linear-gradient(135deg, rgba(77,201,255,0.18), rgba(109,140,255,0.18));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .logo span { color: var(--accent); }
+    .nav-badge {
+      font-family: 'DM Mono', monospace; font-size: 0.75rem;
+      padding: 6px 12px; border-radius: 999px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text2); letter-spacing: 0.8px;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 80px 0 48px;
+      text-align: center;
+    }
+    .hero-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'DM Mono', monospace; font-size: 0.72rem;
+      letter-spacing: 1.8px; text-transform: uppercase;
+      color: var(--text2); padding: 8px 18px; border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 28px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .hero-tag::before { content: ''; width:8px;height:8px;border-radius:50%;background:var(--accent); }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+    h1 {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      line-height: 1.05; letter-spacing: -2px;
+      margin-bottom: 20px;
+      animation: fadeUp 0.6s 0.1s ease both;
+    }
+    h1 .highlight {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      font-size: 1.05rem; color: var(--text2); max-width: 540px;
+      margin: 0 auto 40px; line-height: 1.7;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+    .hero-stats {
+      display: flex; justify-content: center; gap: 40px;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+    .stat { text-align: center; }
+    .stat-val { font-family:'Syne',sans-serif; font-weight:700; font-size:1.6rem; color:var(--accent); }
+    .stat-lbl { font-size:0.75rem; color:var(--text2); letter-spacing:0.5px; margin-top:2px; }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(24px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    /* ── MAIN GRID ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+      padding-bottom: 80px;
+      animation: fadeUp 0.7s 0.35s ease both;
+    }
+    @media(max-width:860px){ .main-grid{grid-template-columns:1fr;} }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius);
+      backdrop-filter: blur(14px);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .card-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-title {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 0.9rem; letter-spacing: 0.5px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .card-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .icon-teal { background: rgba(0,229,204,0.15); }
+    .icon-purple { background: rgba(123,94,167,0.2); }
+    .icon-red { background: rgba(255,107,107,0.15); }
+    .card-body { padding: 20px 24px; }
+
+    /* ── SEARCH ── */
+    .search-wrap {
+      position: relative; margin-bottom: 16px;
+    }
+    .search-wrap input {
+      width: 100%; padding: 12px 16px 12px 44px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 0.9rem;
+      outline: none; transition: border 0.2s, box-shadow 0.2s;
+    }
+    .search-wrap input::placeholder { color: var(--text2); }
+    .search-wrap input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,204,0.1); }
+    .search-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--text2); font-size: 16px; pointer-events: none;
+    }
+
+    /* ── SYMPTOM GRID ── */
+    .symptom-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+      gap: 8px;
+      max-height: 420px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .symptom-grid::-webkit-scrollbar { width:4px; }
+    .symptom-grid::-webkit-scrollbar-track { background:transparent; }
+    .symptom-grid::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+    .symptom-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; border-radius: 10px;
+      background: var(--bg3); border: 1px solid var(--border);
+      cursor: pointer; transition: all 0.2s;
+      font-size: 0.78rem; color: var(--text2);
+      user-select: none;
+    }
+    .symptom-chip:hover {
+      border-color: var(--accent); color: var(--accent);
+      background: rgba(0,229,204,0.06);
+    }
+    .symptom-chip.selected {
+      background: rgba(0,229,204,0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .chip-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      border: 2px solid currentColor; flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .symptom-chip.selected .chip-dot {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .chip-text { text-transform: capitalize; }
+
+    /* Selected bar */
+    .selected-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-radius: 10px;
+      background: rgba(0,229,204,0.06); border: 1px solid rgba(0,229,204,0.15);
+      margin-top: 16px; min-height: 48px;
+    }
+    .selected-tags {
+      display: flex; flex-wrap: wrap; gap: 6px; flex: 1;
+    }
+    .sel-tag {
+      font-size: 0.72rem; padding: 3px 10px; border-radius: 20px;
+      background: rgba(0,229,204,0.15); color: var(--accent);
+      font-family: 'DM Mono', monospace; display: flex; align-items: center; gap: 5px;
+    }
+    .sel-tag-remove {
+      cursor: pointer; opacity: 0.6; font-size: 11px;
+      transition: opacity 0.2s;
+    }
+    .sel-tag-remove:hover { opacity: 1; }
+    .selected-hint { color: var(--text2); font-size: 0.78rem; }
+
+    /* ── ANALYSE BUTTON ── */
+    .btn-analyse {
+      width: 100%; margin-top: 20px; padding: 16px;
+      border-radius: 14px; border: none;
+      background: linear-gradient(135deg, rgba(77,201,255,0.95), rgba(109,140,255,0.95));
+      color: #071019; font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 0.95rem; letter-spacing: 0.6px;
+      cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      position: relative; overflow: hidden;
+      box-shadow: 0 18px 34px rgba(14,70,145,0.22);
+    }
+    .btn-analyse::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .btn-analyse:hover::before { opacity: 1; }
+    .btn-analyse:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(0,229,204,0.35); }
+    .btn-analyse:active { transform: translateY(0); }
+    .btn-analyse:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* ── SIDEBAR ── */
+    .sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── RESULTS ── */
+    #results-section { display: none; }
+    #results-section.visible { display: block; }
+
+    .result-card {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--card);
+      overflow: hidden;
+      margin-bottom: 14px;
+      transition: border-color 0.3s;
+      animation: slideIn 0.4s ease both;
+    }
+    @keyframes slideIn {
+      from { opacity:0; transform:translateX(20px); }
+      to { opacity:1; transform:translateX(0); }
+    }
+    .result-card:nth-child(2) { animation-delay:0.1s; }
+    .result-card:nth-child(3) { animation-delay:0.2s; }
+    .result-card.top { border-color: rgba(0,229,204,0.3); background: rgba(0,229,204,0.04); }
+
+    .result-header {
+      padding: 16px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .result-name {
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .result-rank {
+      font-size: 0.65rem; padding: 2px 7px; border-radius: 4px;
+      font-family: 'DM Mono', monospace; font-weight: 500;
+    }
+    .rank-1 { background: rgba(0,229,204,0.2); color: var(--accent); }
+    .rank-2 { background: rgba(123,94,167,0.2); color: #b39ddb; }
+    .rank-3 { background: rgba(255,255,255,0.08); color: var(--text2); }
+
+    .result-prob {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 1.5rem;
+      color: var(--accent);
+    }
+    .result-prob.medium { color: var(--accent2); }
+    .result-prob.low { color: var(--text2); }
+
+    .prob-bar-wrap {
+      height: 3px; background: rgba(255,255,255,0.06);
+      margin: 0 18px; border-radius: 4px; overflow: hidden;
+    }
+    .prob-bar {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 1s cubic-bezier(0.22, 0.61, 0.36, 1);
+    }
+
+    .result-body { padding: 14px 18px 18px; }
+    .result-desc {
+      font-size: 0.82rem; color: var(--text2); line-height: 1.6;
+      margin-bottom: 12px;
+    }
+
+    .sev-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.72rem; font-family: 'DM Mono', monospace;
+      padding: 4px 10px; border-radius: 6px; margin-bottom: 12px;
+    }
+    .sev-emergency { background:rgba(255,107,107,0.2); color:#ff6b6b; border:1px solid rgba(255,107,107,0.3); }
+    .sev-high { background:rgba(255,107,107,0.12); color:#ffa07a; border:1px solid rgba(255,107,107,0.2); }
+    .sev-chronic { background:rgba(255,209,102,0.12); color:#ffd166; border:1px solid rgba(255,209,102,0.2); }
+    .sev-moderate { background:rgba(123,94,167,0.15); color:#b39ddb; border:1px solid rgba(123,94,167,0.25); }
+    .sev-mild { background:rgba(0,229,204,0.1); color:var(--accent); border:1px solid rgba(0,229,204,0.2); }
+
+    .result-action {
+      font-size: 0.8rem; padding: 10px 12px; border-radius: 8px;
+      background: rgba(255,255,255,0.03); border-left: 3px solid var(--accent);
+      color: var(--text); line-height: 1.55;
+    }
+
+    .matched-symptoms {
+      display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px;
+    }
+    .match-tag {
+      font-size: 0.68rem; padding: 2px 8px; border-radius: 4px;
+      background: rgba(0,229,204,0.08); color: var(--accent);
+      font-family: 'DM Mono', monospace; text-transform: capitalize;
+    }
+    .match-label {
+      font-size: 0.72rem; color: var(--text2);
+      margin-top: 10px; margin-bottom: 5px;
+    }
+
+    /* ── DISCLAIMER ── */
+    .disclaimer {
+      font-size: 0.73rem; color: var(--text2);
+      padding: 12px 16px; border-radius: 10px;
+      background: rgba(255,107,107,0.05); border: 1px solid rgba(255,107,107,0.1);
+      line-height: 1.6; margin-top: 6px;
+    }
+    .disclaimer strong { color: var(--accent3); }
+
+    /* ── LOADING SPINNER ── */
+    .spinner-wrap {
+      display: none; justify-content: center; align-items: center;
+      padding: 40px; flex-direction: column; gap: 16px;
+    }
+    .spinner-wrap.active { display: flex; }
+    .spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner-txt { font-family:'DM Mono',monospace; font-size:0.8rem; color:var(--text2); }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      text-align: center; padding: 48px 24px;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+    .empty-txt { color: var(--text2); font-size: 0.85rem; line-height: 1.6; }
+
+    /* ── DISEASE BROWSER ── */
+    .disease-list {
+      max-height: 280px; overflow-y: auto;
+      padding-right: 4px;
+    }
+    .disease-list::-webkit-scrollbar { width: 4px; }
+    .disease-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+    .disease-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 0; border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
+    }
+    .disease-item:last-child { border-bottom: none; }
+    .disease-item-name { font-weight: 500; }
+
+    /* ── HOW IT WORKS ── */
+    .how-steps { display: flex; flex-direction: column; gap: 14px; }
+    .how-step { display: flex; gap: 14px; align-items: flex-start; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-family:'Syne',sans-serif; font-weight:800; font-size:0.75rem; color:#0a0b0f;
+    }
+    .step-text { font-size: 0.82rem; color: var(--text2); line-height: 1.6; }
+    .step-text strong { color: var(--text); }
+
+    /* ── ERROR ── */
+    .error-msg {
+      padding: 14px 18px; border-radius: 10px;
+      background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.25);
+      color: #ff9999; font-size: 0.85rem; text-align: center;
+      animation: fadeUp 0.3s ease; margin-bottom: 12px;
+    }
+
+    /* Count badge */
+    #selected-count {
+      font-family:'DM Mono',monospace; font-size:0.72rem;
+      padding: 3px 9px; border-radius: 20px;
+      background: rgba(0,229,204,0.15); color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-canvas">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="grid-overlay"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <div class="logo">
+      <div class="logo-icon">MS</div>
+      Medi<span>Scan</span>
+    </div>
+    <div class="nav-badge">Built by ML Engineers</div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="wrap">
+  <div class="hero">
+    <div class="hero-tag">Production ML Diagnostics</div>
+    <h1>Clinical-Grade<br><span class="highlight">Symptom Classifier</span></h1>
+    <p class="hero-sub">Select symptoms and evaluate likely conditions with expert-calibrated model scores, actionable guidance, and transparent predictions.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-val">25</div><div class="stat-lbl">Conditions</div></div>
+      <div class="stat"><div class="stat-val">97</div><div class="stat-lbl">Symptoms</div></div>
+      <div class="stat"><div class="stat-val">94%</div><div class="stat-lbl">Train Accuracy</div></div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- LEFT: SYMPTOM SELECTOR -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon icon-teal">ML</div>
+            Select Symptoms
+          </div>
+          <span id="selected-count">0 selected</span>
+        </div>
+        <div class="card-body">
+          <div class="search-wrap">
+            <span class="search-icon">🔎</span>
+            <input type="text" id="symptom-search" placeholder="Search symptoms..." autocomplete="off">
+          </div>
+
+          <div class="symptom-grid" id="symptom-grid"></div>
+
+          <!-- Selected tags bar -->
+          <div class="selected-bar" id="selected-bar">
+            <div class="selected-tags" id="selected-tags">
+              <span class="selected-hint">No symptoms selected yet…</span>
+            </div>
+          </div>
+
+          <button class="btn-analyse" id="analyse-btn" disabled onclick="analyse()">
+            <span>▶</span> Run Diagnosis
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: SIDEBAR -->
+    <div class="sidebar">
+
+      <!-- Results -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon icon-purple">DS</div>
+            Diagnosis Results
+          </div>
+        </div>
+        <div class="card-body" style="padding: 12px 16px;">
+
+          <!-- Empty -->
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon">ℹ</div>
+            <div class="empty-txt">Select at least 2 symptoms<br>and click Analyse to get started</div>
+          </div>
+
+          <!-- Loading -->
+          <div class="spinner-wrap" id="spinner">
+            <div class="spinner"></div>
+            <div class="spinner-txt">Analysing patterns…</div>
+          </div>
+
+          <!-- Results -->
+          <div id="results-section"></div>
+
+        </div>
+      </div>
+
+      <!-- How it Works -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon icon-teal">WD</div>
+            How It Works
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="how-steps">
+            <div class="how-step">
+              <div class="step-num">1</div>
+              <div class="step-text"><strong>Select Symptoms</strong><br>Choose all symptoms you are experiencing from the panel.</div>
+            </div>
+            <div class="how-step">
+              <div class="step-num">2</div>
+              <div class="step-text"><strong>ML Analysis</strong><br>A Random Forest model with 300 trees analyses your symptom pattern.</div>
+            </div>
+            <div class="how-step">
+              <div class="step-num">3</div>
+              <div class="step-text"><strong>Ranked Results</strong><br>Get top 3 likely conditions with probability scores and action steps.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disease Browser -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon icon-red">DB</div>
+            Disease Database
+          </div>
+        </div>
+        <div class="card-body" style="padding: 8px 20px 16px;">
+          <div class="disease-list" id="disease-list">
+            <div style="color:var(--text2);font-size:0.8rem;text-align:center;padding:16px;">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const SEV_CLASS = {
+    'Emergency':'sev-emergency','High':'sev-high',
+    'Chronic':'sev-chronic','Moderate':'sev-moderate','Mild':'sev-mild'
+  };
+  let allSymptoms = [], selected = new Set();
+
+  // ── INIT ──
+  async function init() {
+    const [sRes, dRes] = await Promise.all([
+      fetch('/api/symptoms').then(r=>r.json()),
+      fetch('/api/diseases').then(r=>r.json())
+    ]);
+    allSymptoms = sRes.symptoms;
+    renderSymptoms(allSymptoms);
+    renderDiseases(dRes.diseases);
+  }
+
+  function renderSymptoms(syms) {
+    const grid = document.getElementById('symptom-grid');
+    grid.innerHTML = syms.map(s => `
+      <div class="symptom-chip ${selected.has(s)?'selected':''}" onclick="toggleSymptom('${s}')" data-sym="${s}">
+        <div class="chip-dot"></div>
+        <span class="chip-text">${s.replace(/_/g,' ')}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderDiseases(diseases) {
+    const el = document.getElementById('disease-list');
+    el.innerHTML = diseases.map(d => `
+      <div class="disease-item">
+        <span class="disease-item-name">${d.name}</span>
+        <span class="sev-badge ${SEV_CLASS[d.severity]||'sev-mild'}">${d.severity}</span>
+      </div>
+    `).join('');
+  }
+
+  function toggleSymptom(sym) {
+    if (selected.has(sym)) selected.delete(sym);
+    else selected.add(sym);
+    updateUI();
+  }
+
+  function removeSymptom(sym) {
+    selected.delete(sym);
+    updateUI();
+  }
+
+  function updateUI() {
+    // Re-render grid (preserve search)
+    const q = document.getElementById('symptom-search').value.toLowerCase();
+    const filtered = q ? allSymptoms.filter(s=>s.replace(/_/g,' ').includes(q)) : allSymptoms;
+    renderSymptoms(filtered);
+
+    // Count
+    document.getElementById('selected-count').textContent = `${selected.size} selected`;
+
+    // Tags bar
+    const tagsEl = document.getElementById('selected-tags');
+    if (selected.size === 0) {
+      tagsEl.innerHTML = '<span class="selected-hint">No symptoms selected yet…</span>';
+    } else {
+      tagsEl.innerHTML = [...selected].map(s => `
+        <span class="sel-tag">
+          ${s.replace(/_/g,' ')}
+          <span class="sel-tag-remove" onclick="removeSymptom('${s}')">✕</span>
+        </span>
+      `).join('');
+    }
+
+    // Button
+    document.getElementById('analyse-btn').disabled = selected.size < 2;
+  }
+
+  // ── SEARCH ──
+  document.getElementById('symptom-search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    const filtered = q ? allSymptoms.filter(s=>s.replace(/_/g,' ').includes(q)) : allSymptoms;
+    renderSymptoms(filtered);
+  });
+
+  // ── ANALYSE ──
+  async function analyse() {
+    const spinner = document.getElementById('spinner');
+    const emptyState = document.getElementById('empty-state');
+    const resultsSection = document.getElementById('results-section');
+
+    emptyState.style.display = 'none';
+    resultsSection.innerHTML = '';
+    spinner.classList.add('active');
+
+    try {
+      const res = await fetch('/api/predict', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({symptoms: [...selected]})
+      });
+      const data = await res.json();
+      spinner.classList.remove('active');
+      resultsSection.classList.add('visible');
+
+      if (!res.ok || data.error) {
+        resultsSection.innerHTML = `<div class="error-msg">${data.error || 'Analysis failed. Please try again.'}</div>`;
+        return;
+      }
+
+      renderResults(data);
+    } catch(e) {
+      spinner.classList.remove('active');
+      resultsSection.classList.add('visible');
+      resultsSection.innerHTML = `<div class="error-msg">Connection error. Please verify the service status.</div>`;
+    }
+  }
+
+  function renderResults(data) {
+    const sec = document.getElementById('results-section');
+    const preds = data.predictions;
+
+    const html = preds.map((p, i) => {
+      const rank = i + 1;
+      const rankLabel = ['🥇 TOP MATCH','🥈 LIKELY','🥉 POSSIBLE'][i] || `#${rank}`;
+      const probColor = p.probability > 50 ? '' : p.probability > 25 ? 'medium' : 'low';
+      const sevClass = SEV_CLASS[p.severity] || 'sev-mild';
+
+      return `
+        <div class="result-card ${rank===1?'top':''}">
+          <div class="result-header">
+            <div class="result-name">
+              ${p.disease}
+              <span class="result-rank rank-${rank}">${rankLabel}</span>
+            </div>
+            <div class="result-prob ${probColor}">${p.probability}%</div>
+          </div>
+          <div class="prob-bar-wrap">
+            <div class="prob-bar" style="width:0%" data-w="${p.probability}"></div>
+          </div>
+          <div class="result-body">
+            <span class="sev-badge ${sevClass}">⚠ ${p.severity}</span>
+            <div class="result-desc">${p.description}</div>
+            <div class="result-action">💡 ${p.action}</div>
+            ${p.matched_symptoms.length ? `
+              <div class="match-label">Matching symptoms (${p.matched_symptoms.length}/${p.total_symptoms}):</div>
+              <div class="matched-symptoms">
+                ${p.matched_symptoms.map(s=>`<span class="match-tag">${s.replace(/_/g,' ')}</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    sec.innerHTML = html + `<div class="disclaimer"><strong>⚠ Medical Disclaimer:</strong> ${data.disclaimer}</div>`;
+
+    // Animate probability bars
+    setTimeout(() => {
+      document.querySelectorAll('.prob-bar').forEach(bar => {
+        bar.style.width = bar.dataset.w + '%';
+      });
+    }, 80);
+  }
+
+  init();
+</script>
+</body>
+</html>
